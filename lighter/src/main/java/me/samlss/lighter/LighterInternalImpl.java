@@ -2,7 +2,6 @@ package me.samlss.lighter;
 
 import android.app.Activity;
 import android.os.Build;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,6 +14,7 @@ import java.util.List;
 import me.samlss.lighter.interfaces.LighterInternalAction;
 import me.samlss.lighter.interfaces.OnLighterListener;
 import me.samlss.lighter.interfaces.OnLighterViewClickListener;
+import me.samlss.lighter.interfaces.OnLighterViewInterceptClickListener;
 import me.samlss.lighter.parameter.LighterParameter;
 import me.samlss.lighter.parameter.MarginOffset;
 import me.samlss.lighter.shape.RectShape;
@@ -42,6 +42,7 @@ public class LighterInternalImpl implements LighterInternalAction {
     private int mShowIndex;
     private OnLighterListener mOnLighterListener;
     private OnLighterViewClickListener mOutSideLighterClickListener;
+    private OnLighterViewInterceptClickListener mOnLighterInterceptClickListener;
 
     public LighterInternalImpl(final Activity activity) {
         mLighterView = new LighterView(activity);
@@ -51,14 +52,14 @@ public class LighterInternalImpl implements LighterInternalAction {
         activity.findViewById(android.R.id.content).addOnLayoutChangeListener(mRootViewLayoutChangeListener);
     }
 
-    public LighterInternalImpl(ViewGroup rootView){
+    public LighterInternalImpl(ViewGroup rootView) {
         mRootView = rootView;
         mLighterView = new LighterView(rootView.getContext());
         mRootView.addOnLayoutChangeListener(mRootViewLayoutChangeListener);
     }
 
     public void addHighlight(LighterParameter... lighterParameters) {
-        if (isReleased){
+        if (isReleased) {
             return;
         }
 
@@ -75,7 +76,7 @@ public class LighterInternalImpl implements LighterInternalAction {
 
     @Override
     public boolean hasNext() {
-        if (isReleased){
+        if (isReleased) {
             return false;
         }
 
@@ -84,7 +85,7 @@ public class LighterInternalImpl implements LighterInternalAction {
 
     @Override
     public void next() {
-        if (isReleased){
+        if (isReleased) {
             return;
         }
 
@@ -94,17 +95,17 @@ public class LighterInternalImpl implements LighterInternalAction {
             return;
         }
 
-        if (!hasNext()){
+        if (!hasNext()) {
             dismiss();
-        }else{
+        } else {
             isShowing = true;
-            if (mOnLighterListener != null){
+            if (mOnLighterListener != null) {
                 mOnLighterListener.onShow(mShowIndex);
             }
 
             mShowIndex++;
             List<LighterParameter> lighterParameters = mHighlightedParameterList.get(0);
-            for (LighterParameter lighterParameter : lighterParameters){
+            for (LighterParameter lighterParameter : lighterParameters) {
                 checkLighterParameter(lighterParameter);
             }
 
@@ -118,30 +119,30 @@ public class LighterInternalImpl implements LighterInternalAction {
 
     /**
      * Check parameter.
-     * */
-    private void checkLighterParameter(LighterParameter lighterParameter){
-        if (lighterParameter.getLighterShape() == null){
+     */
+    private void checkLighterParameter(LighterParameter lighterParameter) {
+        if (lighterParameter.getLighterShape() == null) {
             lighterParameter.setLighterShape(new RectShape());
         }
 
-        if (lighterParameter.getHighlightedView() == null){
+        if (lighterParameter.getHighlightedView() == null) {
             lighterParameter.setHighlightedView(mRootView.findViewById(lighterParameter.getHighlightedViewId()));
         }
 
-        if (lighterParameter.getTipView() == null){
+        if (lighterParameter.getTipView() == null) {
             lighterParameter.setTipView(LayoutInflater.from(mLighterView.getContext()).inflate(lighterParameter.getTipLayoutId(),
                     mLighterView, false));
         }
 
-        if (lighterParameter.getHighlightedView() == null){
+        if (lighterParameter.getHighlightedView() == null) {
             Preconditions.checkNotNull(lighterParameter.getHighlightedView(), "Please pass a highlighted view or an id of highlighted.");
         }
 
-        if (lighterParameter.getTipView() == null){
+        if (lighterParameter.getTipView() == null) {
             Preconditions.checkNotNull(lighterParameter.getTipView(), "Please pass a tip view or a layout id of tip view.");
         }
 
-        if (lighterParameter.getTipViewRelativeMarginOffset() == null){
+        if (lighterParameter.getTipViewRelativeMarginOffset() == null) {
             lighterParameter.setTipViewRelativeMarginOffset(new MarginOffset()); //use empty offset.
         }
 
@@ -150,16 +151,16 @@ public class LighterInternalImpl implements LighterInternalAction {
 
     /**
      * Release all when all specified highlights are completed.
-     * */
-    private void onRelease(){
-        if (isReleased){
+     */
+    private void onRelease() {
+        if (isReleased) {
             return;
         }
 
         isReleased = true;
-        if (isDecorView){
+        if (isDecorView) {
             mRootView.findViewById(android.R.id.content).removeOnLayoutChangeListener(mRootViewLayoutChangeListener);
-        }else{
+        } else {
             mRootView.removeOnLayoutChangeListener(mRootViewLayoutChangeListener);
         }
 
@@ -171,36 +172,55 @@ public class LighterInternalImpl implements LighterInternalAction {
 
         mLighterViewClickListener = null;
         mOnLighterListener = null;
+        mOnLighterInterceptClickListener = null;
         mRootView = null;
         mLighterView = null;
     }
 
     @Override
     public void show() {
-        if (isReleased){
+        if (isReleased) {
             return;
         }
 
+        mLighterView.setIntercept(intercept);
         if (!intercept) {
             mLighterView.setOnClickListener(mLighterViewClickListener);
+        } else {
+            mLighterView.setInterceptClickListener(new OnLighterViewInterceptClickListener() {
+                @Override
+                public void onHighlightClick(View v) {
+                    if (mOnLighterInterceptClickListener != null) {
+                        mOnLighterInterceptClickListener.onHighlightClick(v);
+                    }
+
+                }
+
+                @Override
+                public void onOutClick(View v) {
+                    if (mOnLighterInterceptClickListener != null) {
+                        mOnLighterInterceptClickListener.onOutClick(v);
+                    }
+                }
+            });
         }
 
         //To ensure the root view has attached to window
-        if ( ViewUtils.isAttachedToWindow(mRootView)) {
+        if (ViewUtils.isAttachedToWindow(mRootView)) {
             if (mLighterView.getParent() == null) {
                 mRootView.addView(mLighterView,
                         new ViewGroup.LayoutParams(mRootView.getWidth(), mRootView.getHeight()));
             }
             mShowIndex = 0;
             next();
-        }else{
+        } else {
             mRootView.getViewTreeObserver().addOnGlobalLayoutListener(mGlobalLayoutListener);
         }
     }
 
     @Override
     public void dismiss() {
-        if (mOnLighterListener != null){
+        if (mOnLighterListener != null) {
             mOnLighterListener.onDismiss();
         }
 
@@ -212,14 +232,14 @@ public class LighterInternalImpl implements LighterInternalAction {
      * When you call the {@link #show()} method, maybe the {@link #mRootView} has not been initialized yet and the highlighted view property gets failed.
      * Therefore, before {@link #show()}, will invoke {@link ViewUtils#isAttachedToWindow(View)} to check if the {@link #mRootView} has attached to window,
      * if yes, show directly, otherwise will add {@link ViewTreeObserver#addOnGlobalLayoutListener(ViewTreeObserver.OnGlobalLayoutListener)}.
-     * */
+     */
     private ViewTreeObserver.OnGlobalLayoutListener mGlobalLayoutListener = new ViewTreeObserver.OnGlobalLayoutListener() {
         @Override
         public void onGlobalLayout() {
             /**
              * Guaranteed to be called only once.
              * */
-            if (hasDidRootViewGlobalLayout){
+            if (hasDidRootViewGlobalLayout) {
                 return;
             }
 
@@ -238,11 +258,11 @@ public class LighterInternalImpl implements LighterInternalAction {
             if (left == oldLeft
                     && top == oldTop
                     && right == oldRight
-                    && bottom == oldBottom){
+                    && bottom == oldBottom) {
                 return;
             }
 
-            if (mLighterView == null || mLighterView.getParent() == null){
+            if (mLighterView == null || mLighterView.getParent() == null) {
                 return;
             }
 
@@ -261,7 +281,7 @@ public class LighterInternalImpl implements LighterInternalAction {
     };
 
     public void setBackgroundColor(int color) {
-        if (isReleased){
+        if (isReleased) {
             return;
         }
 
@@ -271,7 +291,7 @@ public class LighterInternalImpl implements LighterInternalAction {
     private View.OnClickListener mLighterViewClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-            if (mOutSideLighterClickListener != null){
+            if (mOutSideLighterClickListener != null) {
                 mOutSideLighterClickListener.onClick(v);
             }
 
@@ -293,8 +313,11 @@ public class LighterInternalImpl implements LighterInternalAction {
         mOutSideLighterClickListener = clickListener;
     }
 
-
     public void setOnLighterListener(OnLighterListener lighterListener) {
         mOnLighterListener = lighterListener;
+    }
+
+    public void setOnLighterInterceptClickListener(OnLighterViewInterceptClickListener listener) {
+        mOnLighterInterceptClickListener = listener;
     }
 }

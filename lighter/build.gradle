@@ -1,5 +1,7 @@
 apply plugin: 'com.android.library'
-apply plugin: 'com.novoda.bintray-release'
+//apply plugin: 'com.novoda.bintray-release'
+apply plugin: 'com.github.dcendents.android-maven'
+group='com.github.jin-king'
 
 android {
     compileSdkVersion 28
@@ -18,11 +20,11 @@ android {
 dependencies {
 }
 
-publish {
-    userOrg = 'samlss'
-    groupId = 'me.samlss'
-    artifactId = 'lighter'
-    publishVersion = '1.0.3'
-    desc = 'A highlight & guide library for android'
-    website = 'https://github.com/samlss/Lighter'
-}
+//publish {
+//    userOrg = 'samlss'
+//    groupId = 'me.samlss'
+//    artifactId = 'lighter'
+//    publishVersion = '1.0.3'
+//    desc = 'A highlight & guide library for android'
+//    website = 'https://github.com/samlss/Lighter'
+//}

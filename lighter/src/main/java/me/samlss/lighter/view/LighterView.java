@@ -9,12 +9,14 @@ import android.os.Build;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import java.util.List;
 
+import me.samlss.lighter.interfaces.OnLighterViewInterceptClickListener;
 import me.samlss.lighter.parameter.Direction;
 import me.samlss.lighter.parameter.LighterParameter;
 import me.samlss.lighter.parameter.MarginOffset;
@@ -28,10 +30,18 @@ import me.samlss.lighter.util.ViewUtils;
  * @description The entire highlighted view,will be filled the parent view, like activity, or specify a parent view.
  */
 public class LighterView extends FrameLayout {
+    private static int CLICK_ACTION_THRESH_HOLD = 300;
+
     private List<LighterParameter> mLighterParameterList;
     private int mBgColor = -1;
     private int mInitWidth;
     private int mInitHeight;
+
+    private boolean mIntercept = false;
+    private float initialTouchX;
+    private float initialTouchY;
+    private long lastTouchDown;
+    private OnLighterViewInterceptClickListener mInterceptListener;
 
     public LighterView(Context context) {
         this(context, null);
@@ -54,14 +64,13 @@ public class LighterView extends FrameLayout {
         init();
     }
 
-    private void init(){
+    private void init() {
         setLayerType(LAYER_TYPE_SOFTWARE, null);
         setWillNotDraw(false);
     }
 
     @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec)
-    {
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int height = MeasureSpec.getSize(heightMeasureSpec);
 
@@ -77,7 +86,43 @@ public class LighterView extends FrameLayout {
         mLighterParameterList = null;
     }
 
-//    @Override
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (mIntercept) {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    initialTouchX = event.getX();
+                    initialTouchY = event.getY();
+                    lastTouchDown = System.currentTimeMillis();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    float endX = event.getX();
+                    float endY = event.getY();
+
+                    int Xdiff = (int) (endX - initialTouchX);
+                    int Ydiff = (int) (endY - initialTouchY);
+
+                    if (System.currentTimeMillis() - lastTouchDown < CLICK_ACTION_THRESH_HOLD
+                            && (Math.abs(Xdiff) < 10 && Math.abs(Ydiff) < 10)) {
+                        if (inHightlightRect(endX, endY)) {
+                            if (mInterceptListener != null) {
+                                mInterceptListener.onHighlightClick(this);
+                            }
+                        } else {
+                            if (mInterceptListener != null) {
+                                mInterceptListener.onOutClick(this);
+                            }
+                        }
+                    }
+                    return true;
+            }
+            return true;
+        } else {
+            return super.onTouchEvent(event);
+        }
+    }
+
+    //    @Override
 //    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
 //        super.onLayout(changed, left, top, right, bottom);
 //
@@ -95,7 +140,7 @@ public class LighterView extends FrameLayout {
 //        reLayout();
 //    }
 
-    public void reLayout(){
+    public void reLayout() {
         for (int i = 0; i < getChildCount(); i++) {
             ViewUtils.calculateHighlightedViewRect(LighterView.this, mLighterParameterList.get(i));
             getChildAt(i).setLayoutParams(calculateLayoutParams(mInitWidth, mInitHeight, mLighterParameterList.get(i), getChildAt(i)));
@@ -111,22 +156,22 @@ public class LighterView extends FrameLayout {
      * Add highlighted view, at the same time, multiple views can be highlighted
      *
      * @param lighterParameters The parameter of highlighted views.
-     * */
-    public void addHighlight(List<LighterParameter> lighterParameters){
-        for (int i = 0; i < getChildCount(); i++){
+     */
+    public void addHighlight(List<LighterParameter> lighterParameters) {
+        for (int i = 0; i < getChildCount(); i++) {
             getChildAt(i).clearAnimation();
         }
 
         removeAllViews();
 
         if (lighterParameters == null
-                || lighterParameters.isEmpty()){
+                || lighterParameters.isEmpty()) {
             return;
         }
 
         mLighterParameterList = lighterParameters;
 
-        for (LighterParameter lighterParameter : lighterParameters){
+        for (LighterParameter lighterParameter : lighterParameters) {
             //check paramters
             addTipView(lighterParameter);
         }
@@ -136,9 +181,9 @@ public class LighterView extends FrameLayout {
      * Add highlighted view
      *
      * @param lighterParameter The parameter of highlighted views.
-     * */
-    public void addTipView(LighterParameter lighterParameter){
-        if (lighterParameter == null){
+     */
+    public void addTipView(LighterParameter lighterParameter) {
+        if (lighterParameter == null) {
             return;
         }
 
@@ -146,72 +191,86 @@ public class LighterView extends FrameLayout {
         View tipView = lighterParameter.getTipView();
         LayoutParams layoutParams = calculateLayoutParams(mInitWidth, mInitHeight, lighterParameter, tipView);
 
-        if (lighterParameter.getTipViewDisplayAnimation() != null){
+        if (lighterParameter.getTipViewDisplayAnimation() != null) {
             tipView.startAnimation(lighterParameter.getTipViewDisplayAnimation());
         }
 
         addView(tipView, layoutParams);
     }
 
+    private boolean inHightlightRect(float x, float y) {
+        if (mLighterParameterList != null && !mLighterParameterList.isEmpty()) {
+            boolean inHighlightRect = false;
+            for (LighterParameter lighterParameter : mLighterParameterList) {
+                RectF rectF = lighterParameter.getHighlightedViewRect();
+                if (rectF.contains(x, y)) {
+                    inHighlightRect = true;
+                }
+            }
+            return inHighlightRect;
+        } else {
+            return false;
+        }
+    }
 
-    private LayoutParams calculateLayoutParams(int width, int height, LighterParameter lighterParameter, View tipView){
+    private LayoutParams calculateLayoutParams(int width, int height, LighterParameter lighterParameter, View tipView) {
         RectF highlightedViewRect = lighterParameter.getHighlightedViewRect();
 
         MarginOffset marginOffset = lighterParameter.getTipViewRelativeMarginOffset();
         LayoutParams layoutParams = (LayoutParams) tipView.getLayoutParams();
-        if (layoutParams == null){
+        if (layoutParams == null) {
             layoutParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         }
 
         if (highlightedViewRect == null
-                || highlightedViewRect.isEmpty()){
+                || highlightedViewRect.isEmpty()) {
             return layoutParams;
         }
 
         boolean alignRight = false;
-        switch (lighterParameter.getTipViewRelativeDirection()){
+        switch (lighterParameter.getTipViewRelativeDirection()) {
             default:
             case Direction.LEFT:
-                layoutParams.topMargin  = (int) highlightedViewRect.top + marginOffset.getTopOffset();
-                layoutParams.rightMargin = (int) (width - highlightedViewRect.right  + marginOffset.getRightOffset() + highlightedViewRect.width());
+                layoutParams.topMargin = (int) highlightedViewRect.top + marginOffset.getTopOffset();
+                layoutParams.rightMargin = (int) (width - highlightedViewRect.right + marginOffset.getRightOffset() + highlightedViewRect.width());
                 break;
 
             case Direction.RIGHT:
-                layoutParams.topMargin  = (int) highlightedViewRect.top + marginOffset.getTopOffset();
+                layoutParams.topMargin = (int) highlightedViewRect.top + marginOffset.getTopOffset();
                 layoutParams.leftMargin = (int) (highlightedViewRect.right + marginOffset.getLeftOffset());
                 break;
 
             case Direction.TOP:
-                if (highlightedViewRect.left > width / 2){ //on the right
+                if (highlightedViewRect.left > width / 2) { //on the right
                     alignRight = true;
-                    layoutParams.rightMargin  = (int) (width - highlightedViewRect.right  + marginOffset.getRightOffset());
-                }else{ //on the left
-                    layoutParams.leftMargin  = (int) (highlightedViewRect.left + marginOffset.getLeftOffset());
+                    layoutParams.rightMargin = (int) (width - highlightedViewRect.right + marginOffset.getRightOffset());
+                } else { //on the left
+                    layoutParams.leftMargin = (int) (highlightedViewRect.left + marginOffset.getLeftOffset());
                 }
-                layoutParams.bottomMargin = (int) (height - highlightedViewRect.bottom +  highlightedViewRect.height() + marginOffset.getBottomOffset());
+                layoutParams.bottomMargin = (int) (height - highlightedViewRect.bottom + highlightedViewRect.height() + marginOffset.getBottomOffset());
                 break;
 
             case Direction.BOTTOM:
-                if (highlightedViewRect.left > width / 2){ //on the right
+                if (highlightedViewRect.left > width / 2) { //on the right
                     alignRight = true;
-                    layoutParams.rightMargin  = (int) (width - highlightedViewRect.right  + marginOffset.getRightOffset());
-                }else{ //on the left
-                    layoutParams.leftMargin  = (int) (highlightedViewRect.left + marginOffset.getLeftOffset());
+                    layoutParams.rightMargin = (int) (width - highlightedViewRect.right + marginOffset.getRightOffset());
+                } else { //on the left
+                    layoutParams.leftMargin = (int) (highlightedViewRect.left + marginOffset.getLeftOffset());
                 }
                 layoutParams.topMargin = (int) (highlightedViewRect.bottom + marginOffset.getTopOffset());
                 break;
         }
 
-        if(layoutParams.rightMargin != 0
-                || alignRight){
+        if (layoutParams.rightMargin != 0
+                || alignRight) {
             layoutParams.gravity = Gravity.RIGHT;
-        }else {
+        } else {
             layoutParams.gravity = Gravity.LEFT;
         }
 
-        if(layoutParams.bottomMargin != 0){
+        if (layoutParams.bottomMargin != 0) {
             layoutParams.gravity |= Gravity.BOTTOM;
-        }else {
+        } else {
             layoutParams.gravity |= Gravity.TOP;
         }
 
@@ -220,8 +279,8 @@ public class LighterView extends FrameLayout {
 
     /**
      * Check if the shape is empty.
-     * */
-    private boolean isShapeEmpty(LighterShape lighterShape){
+     */
+    private boolean isShapeEmpty(LighterShape lighterShape) {
         return lighterShape == null
                 || lighterShape.getViewRect() == null
                 || lighterShape.getViewRect().isEmpty();
@@ -231,7 +290,7 @@ public class LighterView extends FrameLayout {
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
-        if (mBgColor == -1){
+        if (mBgColor == -1) {
             mBgColor = ViewUtils.DEFAULT_HIGHLIGHT_VIEW_BG_COLOR;
         }
 
@@ -243,7 +302,7 @@ public class LighterView extends FrameLayout {
                 if (lighterParameter.getHighlightedView() == null
                         || lighterParameter.getLighterShape() == null
                         || lighterParameter.getLighterShape().getViewRect() == null
-                        || lighterParameter.getLighterShape().getViewRect().isEmpty()){
+                        || lighterParameter.getLighterShape().getViewRect().isEmpty()) {
                     continue;
                 }
                 canvas.clipPath(lighterParameter.getLighterShape().getShapePath(), Region.Op.DIFFERENCE);
@@ -257,7 +316,7 @@ public class LighterView extends FrameLayout {
         if (mLighterParameterList != null && !mLighterParameterList.isEmpty()) {
             for (LighterParameter lighterParameter : mLighterParameterList) {
 
-                if (isShapeEmpty(lighterParameter.getLighterShape())){
+                if (isShapeEmpty(lighterParameter.getLighterShape())) {
                     continue;
                 }
 
@@ -274,5 +333,13 @@ public class LighterView extends FrameLayout {
 
     public void setInitWidth(int initWidth) {
         this.mInitWidth = initWidth;
+    }
+
+    public void setIntercept(boolean intercept) {
+        this.mIntercept = intercept;
+    }
+
+    public void setInterceptClickListener(OnLighterViewInterceptClickListener listener) {
+        this.mInterceptListener = listener;
     }
 }

@@ -5,6 +5,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
+import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.BounceInterpolator;
 import android.view.animation.TranslateAnimation;
@@ -12,6 +13,7 @@ import android.widget.Toast;
 
 import me.samlss.lighter.Lighter;
 import me.samlss.lighter.interfaces.OnLighterListener;
+import me.samlss.lighter.interfaces.OnLighterViewInterceptClickListener;
 import me.samlss.lighter.parameter.Direction;
 import me.samlss.lighter.parameter.LighterParameter;
 import me.samlss.lighter.parameter.MarginOffset;
@@ -38,7 +40,7 @@ public class RelativeLayoutActivity extends AppCompatActivity {
         showGuide();
     }
 
-    private void showGuide(){
+    private void showGuide() {
         TranslateAnimation translateAnimation = new TranslateAnimation(-500, 0, 0, 0);
         translateAnimation.setDuration(500);
         translateAnimation.setInterpolator(new BounceInterpolator());
@@ -50,62 +52,77 @@ public class RelativeLayoutActivity extends AppCompatActivity {
         RectShape rectShape = new RectShape();
         rectShape.setPaint(LighterHelper.getDiscretePaint());
 
-        Lighter.with(this)
-                .setBackgroundColor(0xB3000000)
-                .setOnLighterListener(new OnLighterListener() {
-                    @Override
-                    public void onShow(int index) {
-                        Toast.makeText(getApplicationContext(), "正在显示第" + (index+1) + "高亮", Toast.LENGTH_SHORT).show();
-                    }
+        final Lighter lighter = Lighter.with(this);
+        lighter.setBackgroundColor(0xB3000000);
+        lighter.setOnLighterListener(new OnLighterListener() {
+            @Override
+            public void onShow(int index) {
+//                        Toast.makeText(getApplicationContext(), "正在显示第" + (index+1) + "高亮", Toast.LENGTH_SHORT).show();
+            }
 
-                    @Override
-                    public void onDismiss() {
-                        Toast.makeText(getApplicationContext(), "高亮已全部显示完毕", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .addHighlight(new LighterParameter.Builder()
-                        .setHighlightedViewId(R.id.iv_head_photo)
-                        .setTipLayoutId(R.layout.layout_tip_1)
-                        .setLighterShape(circleShape)
-                        .setTipViewRelativeDirection(Direction.RIGHT)
-                        .setTipViewDisplayAnimation(LighterHelper.getScaleAnimation())
-                        .setTipViewRelativeOffset(new MarginOffset(30, 0, 80, 0))
-                        .build())
-                .addHighlight(new LighterParameter.Builder()
-                        .setHighlightedViewId(R.id.layout_balance)
-                        .setTipLayoutId(R.layout.layout_tip_2)
-                        .setLighterShape(rectShape)
+            @Override
+            public void onDismiss() {
+//                        Toast.makeText(getApplicationContext(), "高亮已全部显示完毕", Toast.LENGTH_SHORT).show();
+            }
+        });
+        lighter.setIntercept(true);
+        lighter.setOnLighterInterceptClickListener(new OnLighterViewInterceptClickListener() {
+            @Override
+            public void onHighlightClick(View v) {
+                Toast.makeText(RelativeLayoutActivity.this, "点击高亮", Toast.LENGTH_SHORT).show();
+                lighter.dismiss();
+            }
+
+            @Override
+            public void onOutClick(View v) {
+                Toast.makeText(RelativeLayoutActivity.this, "点击外部", Toast.LENGTH_SHORT).show();
+                lighter.dismiss();
+            }
+        });
+        lighter.addHighlight(new LighterParameter.Builder()
+                .setHighlightedViewId(R.id.iv_head_photo)
+                .setTipLayoutId(R.layout.layout_tip_1)
+                .setLighterShape(circleShape)
+                .setTipViewRelativeDirection(Direction.RIGHT)
+                .setTipViewDisplayAnimation(LighterHelper.getScaleAnimation())
+                .setTipViewRelativeOffset(new MarginOffset(30, 0, 80, 0))
+                .build());
+        lighter.addHighlight(new LighterParameter.Builder()
+                .setHighlightedViewId(R.id.layout_balance)
+                .setTipLayoutId(R.layout.layout_tip_2)
+                .setLighterShape(rectShape)
+                .setTipViewRelativeDirection(Direction.TOP)
+                .setShapeXOffset(10)
+                .setShapeYOffset(10)
+                .setTipViewDisplayAnimation(translateAnimation)
+                .setTipViewRelativeOffset(new MarginOffset(0, 10, 0, 20))
+                .build());
+        lighter.addHighlight(new LighterParameter.Builder()
+                .setHighlightedViewId(R.id.btn_highlight2)
+                .setTipView(LighterHelper.createCommonTipView(this, R.drawable.icon_tip_4, "向左移动"))
+                .setLighterShape(rectShape)
+                .setTipViewRelativeDirection(Direction.LEFT)
+                .setTipViewDisplayAnimation(LighterHelper.getScaleAnimation())
+                .setTipViewRelativeOffset(new MarginOffset(0, 20, 0, 0))
+                .build());
+        lighter.addHighlight(new LighterParameter.Builder()
+                        .setHighlightedViewId(R.id.btn_highlight1)
+                        .setTipLayoutId(R.layout.layout_tip_3)
+                        .setLighterShape(new RectShape(0, 0, 25))
                         .setTipViewRelativeDirection(Direction.TOP)
-                        .setShapeXOffset(10)
-                        .setShapeYOffset(10)
-                        .setTipViewDisplayAnimation(translateAnimation)
-                        .setTipViewRelativeOffset(new MarginOffset(0, 10, 0, 20))
-                        .build())
-                .addHighlight(new LighterParameter.Builder()
-                        .setHighlightedViewId(R.id.btn_highlight2)
-                        .setTipView(LighterHelper.createCommonTipView(this, R.drawable.icon_tip_4, "向左移动"))
-                        .setLighterShape(rectShape)
-                        .setTipViewRelativeDirection(Direction.LEFT)
                         .setTipViewDisplayAnimation(LighterHelper.getScaleAnimation())
-                        .setTipViewRelativeOffset(new MarginOffset(0, 20, 0, 0))
-                        .build())
-                .addHighlight(new LighterParameter.Builder()
-                                .setHighlightedViewId(R.id.btn_highlight1)
-                                .setTipLayoutId(R.layout.layout_tip_3)
-                                .setLighterShape(new RectShape(0, 0, 25))
-                                .setTipViewRelativeDirection(Direction.TOP)
-                                .setTipViewDisplayAnimation(LighterHelper.getScaleAnimation())
-                                .setTipViewRelativeOffset(new MarginOffset(100, 10, 0, 20))
-                                .build(),
+                        .setTipViewRelativeOffset(new MarginOffset(100, 10, 0, 20))
+                        .build(),
 
-                        new LighterParameter.Builder()
-                                .setHighlightedViewId(R.id.btn_highlight3)
-                                .setTipLayoutId(R.layout.layout_tip_1)
-                                .setLighterShape(new OvalShape())
-                                .setTipViewRelativeDirection(Direction.BOTTOM)
-                                .setTipViewDisplayAnimation(LighterHelper.getScaleAnimation())
-                                .setTipViewRelativeOffset(new MarginOffset(300, 0, 0, 0))
-                                .build())
-                .show();
+                new LighterParameter.Builder()
+                        .setHighlightedViewId(R.id.btn_highlight3)
+                        .setTipLayoutId(R.layout.layout_tip_1)
+                        .setLighterShape(new OvalShape())
+                        .setTipViewRelativeDirection(Direction.BOTTOM)
+                        .setTipViewDisplayAnimation(LighterHelper.getScaleAnimation())
+                        .setTipViewRelativeOffset(new MarginOffset(300, 0, 0, 0))
+                        .build()
+        );
+        lighter.show();
     }
 }
